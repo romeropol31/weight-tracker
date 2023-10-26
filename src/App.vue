@@ -76,8 +76,7 @@ form input[type="number"] {
 	outline: none;
 	border: none;
 	background-color: white;
-
-	flex: 1 1 0%;
+	width: 100%;
 	padding: 1rem 1.5rem;
 	font-size: 1.25rem;
 }
@@ -106,7 +105,6 @@ form input[type="submit"]:hover {
 
 .canvas-box {
 	width: 100%;
-	max-width: 720px;
 	background-color: white;
 	padding: 1rem;
 	border-radius: 0.5rem;
@@ -160,61 +158,114 @@ form input[type="submit"]:hover {
       <span>{{ currentWeight.weight }}</span>
       <small>Current Weight (kg)</small>
     </div>
-	<v-data-table :items="weights" :headers="headersTest" class="elevation-1" />
+	
+	<div class="canvas-box">
+	  <canvas ref="weightChartEl"></canvas>
+	</div>
 
     <form @submit.prevent="addWeight">
       <input type="number" v-model="weightInput" step="0.1" />
       <input type="submit" value="Add weight" />
     </form>
+	
+	<div class="weight-history">
+	  <h2>Weight History</h2>
+	  <v-data-table :items="weights" :headers="headersTest" class="elevation-1">
+		<template v-slot:item.weight="{item}">
+			<v-text-field v-if="item.raw.id === editedItem.id" v-model="editedItem.weight" :hide-details="true" dense single-line :autofocus="true" @blur="saveItem"></v-text-field>
+    	<span v-else>{{item.raw.weight}}</span>
+		</template>
+		<template v-slot:item.date="{item}">
+    	{{new Date(item.raw.date).toLocaleDateString()}}
+		</template>
+		<template v-slot:item.actions="{item}">
+			<div style="display:flex;flex-direction: row;">
+				<v-icon color="green" class="mr-3" @click="editItem(item.raw)">
+					mdi-pencil
+				</v-icon>
+				<v-icon color="red" @click="deleteItem(item.raw)">
+					mdi-delete
+				</v-icon>
+			</div>
+		</template>
+	  </v-data-table>
+	</div>
 
-    <div v-if="weights && weights.length">
-      <h2>Last 7 days</h2>
-
-      <div class="canvas-box">
-        <canvas ref="weightChartEl"></canvas>
-      </div>
-
-      <div class="weight-history">
-        <h2>Weight History</h2>
-        <ul>
-          <li v-for="weight in weights">
-            <span>{{ weight.weight }}kg</span>
-            <small>{{ new Date(weight.date).toLocaleDateString() }}</small>
-          </li>
-        </ul>
-      </div>
-    </div>
   </main>
 </template>
 
 <script setup>
-import { ref,shallowRef,computed,watch,nextTick,onMounted} from 'vue';
+import { ref,shallowRef,computed,watch,nextTick,onMounted } from 'vue';
 import Chart from 'chart.js/auto';
 
 const weights = ref([]);
 const weightChartEl = ref(null);
+
 const weightChart = shallowRef(null);
 
 const weightInput = ref(60.0);
 
-const headersTest = ref([{
-	text:'Troleada',value:'weight',
-}])
+const editedIndex = ref(-1);
+const editedItem = ref({
+	id:0,
+	weight:'',
+	date:'',
+})
+
+const headersTest = ref([
+	{title:'Weight',key:'weight'},
+	{title:'Date',key:'date'},
+	{title:'',key:'actions',sortable:false,width:'5px'},
+])
 const currentWeight = computed(() => {
   return weights.value.sort((a,b) => b.date - a.date)[0] || { weight:0 };
 })
 
+const editItem = (item) => {
+	editedIndex.value = weights.value.indexOf(item);
+	editedItem.value = Object.assign({}, item);
+}
+
+const deleteItem = (item) => {
+	const index = weights.value.indexOf(item);
+	weights.value.splice(index, 1);
+}
+const saveItem = () => {
+	if (editedIndex.value > -1) {
+		Object.assign(weights.value[editedIndex.value], editedItem.value)
+	}
+	editedItem.value = Object.assign({}, {id:0,weight:'',date:''});
+	editedIndex.value = -1;
+}
 
 const addWeight = () => {
   weights.value.push({
+		id: weights.value.length + 1,
     weight:weightInput.value,
     date: new Date().getTime()
   });
 }
 onMounted(() => {
   let ls = (JSON.parse(localStorage.getItem("data")));
-  console.log(ls);
   if(ls != null && ls.weights.length)weights.value = ls.weights;
+  weightChart.value = new Chart(weightChartEl.value.getContext('2d'),{
+	type:'line',
+	data:{
+		labels:ls !=null && ls.weights.length ? weights.value.sort((a,b) => a.date - b.date).map(w => new Date(w.date).toLocaleDateString()) : [],
+		datasets:[
+			{label:'weight',
+			data:ls !=null && ls.weights.length ? weights.value.sort((a,b) => a.date - b.date).map(w => w.weight) : [],
+			backgroundColor:'rgba(255,105,180,0.2)',
+          	borderColor:'rgb(255,105,180)',
+          	borderWidth:1,
+          	fill:true}
+		]
+	},
+	options:{
+        responsive:true,
+        maintainAspectRatio:false
+      }
+  })
 })
 
 watch(weights, newWeights => {
@@ -228,27 +279,6 @@ watch(weights, newWeights => {
 
     return;
   }
-
-  nextTick(() => {
-    weightChart.value = new Chart(weightChartEl.value.getContext('2d'),{
-      type:'line',
-      data:{
-        labels:ws.sort((a,b) => a.date - b.date).map(w => new Date(w.date).toLocaleDateString()),
-        datasets:[
-          {label:'weight',
-          data:ws.sort((a,b) => a.date - b.date).map(w => w.weight),
-          backgroundColor:'rgba(255,105,180,0.2)',
-          borderColor:'rgb(255,105,180)',
-          borderWidth:1,
-          fill:true}
-        ]
-      },
-      options:{
-        responsive:true,
-        maintainAspectRatio:false
-      }
-    })
-  })
 },{deep:true})
  
 </script>
