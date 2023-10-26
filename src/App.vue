@@ -160,6 +160,7 @@ form input[type="submit"]:hover {
       <span>{{ currentWeight.weight }}</span>
       <small>Current Weight (kg)</small>
     </div>
+	<v-data-table :items="weights" :headers="headersTest" class="elevation-1" />
 
     <form @submit.prevent="addWeight">
       <input type="number" v-model="weightInput" step="0.1" />
@@ -196,6 +197,9 @@ const weightChart = shallowRef(null);
 
 const weightInput = ref(60.0);
 
+const headersTest = ref([{
+	text:'Troleada',value:'weight',
+}])
 const currentWeight = computed(() => {
   return weights.value.sort((a,b) => b.date - a.date)[0] || { weight:0 };
 })
